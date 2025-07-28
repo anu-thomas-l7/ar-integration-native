@@ -9,7 +9,6 @@ import com.facebook.react.bridge.*
 import java.nio.FloatBuffer
 import android.util.Log
 
-
 class OnnxModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
@@ -20,20 +19,18 @@ class OnnxModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun loadModel(promise: Promise) {
-    try {
-        if (ortSession == null) {
-            val model = reactContext.assets.open("end2end.onnx").readBytes()
-            
-            ortSession  = ortEnv.createSession(model)
-            promise.resolve("Model loaded successfully")
-        } else {
-            promise.resolve("Model already loaded")
+        try {
+            if (ortSession == null) {
+                val model = reactContext.assets.open("end2end.onnx").readBytes()
+                ortSession = ortEnv.createSession(model)
+                promise.resolve("Model loaded successfully")
+            } else {
+                promise.resolve("Model already loaded")
+            }
+        } catch (e: Exception) {
+            promise.reject("LOAD_MODEL_ERROR", "Failed to load model: ${e.message}")
         }
-    } catch (e: Exception) {
-        promise.reject("LOAD_MODEL_ERROR", "Failed to load model: ${e.message}")
     }
-}
-
 
     init {
         try {
@@ -64,28 +61,44 @@ class OnnxModule(private val reactContext: ReactApplicationContext) :
             val tensor = OnnxTensor.createTensor(ortEnv, inputTensor, shape)
             val output = ortSession!!.run(mapOf(inputName to tensor))
 
-           Log.d("ONNX_OUTPUT", "Output count: ${output}")
-
-            output.forEachIndexed { index, result ->
-                Log.d("ONNX_OUTPUT", "Output [$index]: ${result.javaClass.name}")
+           
+            for ((name, result) in output) {
+                if (result is OnnxTensor) {
+                    Log.d("ONNX_OUTPUT", "Output name: $name")
+                    Log.d("ONNX_OUTPUT", "Tensor type: ${result.info}")
+                } else {
+                    Log.d("ONNX_OUTPUT", "Output $name is not a tensor")
+                }
             }
 
+            // val simccXOutput = output["simcc_x"]
+            val simccXOutput = output.get(0)
+            val simccYOutput = output.get(1)
+            Log.d("simccYOutput", "simccYOutput is: $simccYOutput")
+            Log.d("simccXOutput", "simccXOutput is: $simccXOutput")
+            if (simccXOutput !is OnnxTensor || simccYOutput !is OnnxTensor) {
+                promise.reject("ONNX_OUTPUT_ERROR", "Output is not a tensor")
+                return
+            }
 
+            val simccX = simccXOutput.value as Array<Array<FloatArray>>
+            val simccY = simccYOutput.value as Array<Array<FloatArray>>
+           
+            for (i in simccX.indices) {
+                for (j in simccX[i].indices) {
+                    val xRow = simccX[i][j].joinToString(", ") { "%.4f".format(it) }
+                    val yRow = simccY[i][j].joinToString(", ") { "%.4f".format(it) }
 
-            val simccXOutput = output.get("simcc_x")
-            val simccYOutput = output.get("simcc_y")
+                    Log.d("ONNX_X", "Keypoint $i-$j X: [$xRow]")
+                    Log.d("ONNX_Y", "Keypoint $i-$j Y: [$yRow]")
+                }
+            }
 
-        if (simccXOutput !is OnnxTensor || simccYOutput !is OnnxTensor) {
-        promise.reject("ONNX_OUTPUT_ERROR", "Output is not a tensor")
-            return
-        }
-
-            val simccXTensor = simccXOutput as OnnxTensor
-            val simccYTensor = simccYOutput as OnnxTensor
-
-            val simccX = (simccXTensor.value as Array<Array<FloatArray>>)[0]
-            val simccY = (simccYTensor.value as Array<Array<FloatArray>>)[0]
-
+            // Extract coordinates
+            val keypointsX = simccX[0]
+            val keypointsY = simccY[0]
+            Log.d("keypointsX", "keypointsX is: $keypointsX")
+            Log.d("keypointsY", "keypointsY is: $keypointsY")
             val resultMap = Arguments.createMap()
             val bodyPartMap = mapOf(
                 "Neck" to 18,
@@ -94,7 +107,7 @@ class OnnxModule(private val reactContext: ReactApplicationContext) :
             )
 
             for ((label, index) in bodyPartMap) {
-                val coords = extractCoordinates(simccX, simccY, index, scaledBitmap)
+                val coords = extractCoordinates(keypointsX, keypointsY, index, scaledBitmap)
                 if (coords != null) {
                     val pointMap = Arguments.createMap()
                     pointMap.putDouble("x", coords.first.toDouble())
@@ -126,4 +139,8 @@ class OnnxModule(private val reactContext: ReactApplicationContext) :
 
         return Pair(x, y)
     }
+
+   
 }
+
+
