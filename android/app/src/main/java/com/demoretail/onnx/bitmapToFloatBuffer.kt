@@ -2,25 +2,43 @@ package com.demoretail.onnx
 
 import android.graphics.Bitmap
 import java.nio.FloatBuffer
-
 fun bitmapToFloatBuffer(bitmap: Bitmap): FloatBuffer {
     val width = bitmap.width
     val height = bitmap.height
-    val inputSize = width * height * 3
-    val buffer = FloatBuffer.allocate(inputSize)
-
+    val floatValues = FloatBuffer.allocate(3 * height * width)
     val pixels = IntArray(width * height)
     bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-    for (pixel in pixels) {
-        val r = ((pixel shr 16) and 0xFF) / 255.0f
-        val g = ((pixel shr 8) and 0xFF) / 255.0f
-        val b = (pixel and 0xFF) / 255.0f
-        buffer.put(r)
-        buffer.put(g)
-        buffer.put(b)
+    // Fill R channel
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val idx = y * width + x
+            val pixel = pixels[idx]
+            val r = ((pixel shr 16) and 0xFF) / 255.0f
+            floatValues.put(r)
+        }
     }
 
-    buffer.rewind()
-    return buffer
+    // Fill G channel
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val idx = y * width + x
+            val pixel = pixels[idx]
+            val g = ((pixel shr 8) and 0xFF) / 255.0f
+            floatValues.put(g)
+        }
+    }
+
+    // Fill B channel
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val idx = y * width + x
+            val pixel = pixels[idx]
+            val b = (pixel and 0xFF) / 255.0f
+            floatValues.put(b)
+        }
+    }
+
+    floatValues.rewind()
+    return floatValues
 }

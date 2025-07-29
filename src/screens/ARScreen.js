@@ -430,7 +430,6 @@
 //     resizeMode: 'contain',
 //   },
 // });
-
 import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
@@ -440,12 +439,16 @@ import {
   Platform,
   Text,
 } from 'react-native';
-import {Camera, useCameraDevices,useCameraDevice} from 'react-native-vision-camera';
+import {
+  Camera,
+  useCameraDevices,
+  useCameraDevice,
+} from 'react-native-vision-camera';
 import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import {NativeModules} from 'react-native';
 const {OnnxModule} = NativeModules; // ✅ Use this to access your native Kotlin moduleimport ORNAMENT_IMAGE from './ornament.png'; // Your overlay image
-
+ 
 const ARScreen = () => {
   const cameraRef = useRef(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -453,56 +456,9 @@ const ARScreen = () => {
   //const [overlayPos, setOverlayPos] = useState<{ x: number, y: number } | null>(null);
   const [overlayPos, setOverlayPos] = useState(null);
   const [error, setError] = useState('');
-  const device = useCameraDevice('front')
+  const device = useCameraDevice('front');
   console.log('Device:', device);
-  
-
-  //console.log('device',device);
-  //console.log('devices',devices);
-
-  // useEffect(() => {
-  //   console.log("entered into useffect of permission request");
-
-  //   const getPermissions = async () => {
-  //     try {
-  //       const cameraPermission =
-  //         Platform.OS === 'android'
-  //           ? await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA)
-  //           : await request(PERMISSIONS.IOS.CAMERA);
-
-  //       if (
-  //         cameraPermission === 'granted' ||
-  //         cameraPermission === RESULTS.GRANTED
-  //       ) {
-  //         setHasPermission(true);
-  //       } else {
-  //         setHasPermission(false);
-  //       }
-  //     } catch (err) {
-  //       console.error('Permission error:', err);
-  //     }
-  //   };
-
-  //   getPermissions();
-  //   console.log("existing from useffect of permission request");
-
-  // }, []);
-
-  useEffect(() => {
-    const initOnnxModel = async () => {
-      try {
-        const result = await OnnxModule.initializeModel();
-        console.log("✅ ONNX model initialized:", result);
-      } catch (err) {
-        console.error("❌ ONNX model init failed:", err);
-        setError("ONNX model initialization failed");
-      }
-    };
-  
-    initOnnxModel();
-  }, []);
-  
-
+ 
   useEffect(() => {
     (async () => {
       const status = await Camera.requestCameraPermission();
@@ -510,58 +466,11 @@ const ARScreen = () => {
       console.log('Camera permission status:', status);
     })();
   }, []);
-
-
-
+ 
   useEffect(() => {
     console.log('Permission state updated:', hasPermission);
   }, [hasPermission]);
-  // useEffect(() => {
-  //   console.log('📷 All Devices:', devices);
-  //   console.log('📷 Selected Device:', device);
-  // }, [devices]);
-
-  // useEffect(() => {
-  //   let interval;
-
-  //   console.log('hasPermission check', hasPermission);
-  //   console.log('device check', device);
-
-  //   console.log('cameraRef check', cameraRef.current);
-
-  //   if (hasPermission && cameraRef.current) {
-  //     interval = setInterval(async () => {
-  //       try {
-  //         const photo = await cameraRef.current?.takePhoto({
-  //           qualityPrioritization: 'quality',
-  //           flash: 'off',
-  //         });
-
-  //         if (photo?.path) {
-  //           const properUri = photo.path.startsWith('file://')
-  //             ? photo.path
-  //             : 'file://' + photo.path;
-  //           const base64 = await RNFS.readFile(properUri, 'base64');
-
-  //           const coords = await OnnxModule.runModelFromBase64(base64);
-  //           console.log('🟢 Coordinates from model:', coords);
-
-  //           if (coords?.x && coords?.y) {
-  //             setOverlayPos({x: coords.x, y: coords.y});
-  //           } else {
-  //             console.warn('Invalid coordinates from model');
-  //           }
-  //         }
-  //       } catch (err) {
-  //         console.error('Error capturing or processing photo:', err);
-  //         setError(err.message || 'Unknown error');
-  //       }
-  //     }, 3000); // every 3 seconds
-  //   }
-
-  //   return () => clearInterval(interval);
-  // }, [hasPermission]);
-
+ 
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -571,14 +480,13 @@ const ARScreen = () => {
         console.error('Failed to load model:', err);
       }
     };
-  
+ 
     initialize();
   }, []);
-  
-
+ 
   useEffect(() => {
     let interval;
-  
+ 
     if (hasPermission && isCameraReady && cameraRef.current) {
       interval = setInterval(async () => {
         try {
@@ -586,15 +494,21 @@ const ARScreen = () => {
             qualityPrioritization: 'quality',
             flash: 'off',
           });
-  
-          const uri = photo?.path?.startsWith('file://') ? photo.path : `file://${photo?.path}`;
+ 
+          const uri = photo?.path?.startsWith('file://')
+            ? photo.path
+            : `file://${photo?.path}`;
           const base64 = await RNFS.readFile(uri, 'base64');
           const coords = await OnnxModule.runModelFromBase64(base64);
-  
-          if (coords?.x && coords?.y) {
-            setOverlayPos({ x: coords.x, y: coords.y });
+          console.log('coords', coords);
+          console.log('x value', coords?.LeftEar.x);
+          console.log('y value', coords?.LeftEar.y);
+          if (coords && coords?.LeftEar) {
+            console.log('x value', coords?.LeftEar.x);
+            console.log('y value', coords?.LeftEar.y);
+            setOverlayPos({x: coords.LeftEar.x, y: coords.LeftEar.y});
           } else {
-            console.warn('Invalid coordinates from model');
+            // console.warn('Invalid coordinates from model');
           }
         } catch (err) {
           console.error('Error taking photo:', err);
@@ -602,11 +516,10 @@ const ARScreen = () => {
         }
       }, 3000);
     }
-  
+ 
     return () => clearInterval(interval);
   }, [hasPermission, isCameraReady]);
-  
-
+ 
   //console.log("haspermission-"+hasPermission);
   //  console.log("device"+device);
   if (!device || !hasPermission) {
@@ -618,11 +531,10 @@ const ARScreen = () => {
       </View>
     );
   }
-  console.log("hasPermission:", hasPermission);
-console.log("device:", device);
-//console.log("cameraRef.current BEFORE render:", cameraRef.current);
-
-
+  console.log('hasPermission:', hasPermission);
+  console.log('device:', device);
+  //console.log("cameraRef.current BEFORE render:", cameraRef.current);
+ 
   return (
     <View style={styles.container}>
       <Camera
@@ -636,20 +548,20 @@ console.log("device:", device);
           setIsCameraReady(true);
         }}
       />
-
+      {console.log('overlayPos', overlayPos)}
       {overlayPos && (
         <Image
-          source={ORNAMENT_IMAGE}
+          source={require('./../../assets/icons/earring.png')}
           style={[
             styles.overlay,
             {
-              left: overlayPos.x - 25,
-              top: overlayPos.y - 25,
+              left: overlayPos.x - 1,
+              top: overlayPos.y - -85,
             },
           ]}
         />
       )}
-
+ 
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>Error: {error}</Text>
@@ -658,17 +570,17 @@ console.log("device:", device);
     </View>
   );
 };
-
+ 
 export default ARScreen;
-
+ 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   overlay: {
     position: 'absolute',
-    width: 50,
-    height: 50,
+    width: 60,
+    height: 60,
     resizeMode: 'contain',
   },
   errorBox: {
@@ -694,3 +606,5 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+ 
+ 
