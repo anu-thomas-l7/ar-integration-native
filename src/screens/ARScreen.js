@@ -14,7 +14,9 @@ import {
   useCameraDevice,
 } from 'react-native-vision-camera';
 import RNFS from 'react-native-fs';
-import {NativeModules} from 'react-native';
+import {NativeModules, Dimensions} from 'react-native';
+import ImageEditor from '@react-native-community/image-editor';
+
 const {OnnxModule} = NativeModules;
 
 const ARScreen = () => {
@@ -56,11 +58,35 @@ const ARScreen = () => {
             qualityPrioritization: 'quality',
             flash: 'off',
           });
+          console.log('photo', photo);
+          if (photo.isMirrored) {
+            try {
+              const tempPath = `${RNFS.CachesDirectoryPath}/flippable_image.jpg`;
+              await RNFS.copyFile(photo.path, tempPath);
 
-          const uri = photo?.path?.startsWith('file://')
-            ? photo.path
-            : `file://${photo?.path}`;
-          const base64 = await RNFS.readFile(uri, 'base64');
+              const cropData = {
+                offset: {x: 0, y: 0},
+                size: {width: photo.width, height: photo.height},
+                displaySize: {width: photo.width, height: photo.height},
+                resizeMode: 'contain',
+                flip: {horizontal: true}, // mirror flip
+              };
+              var finalUri = await ImageEditor.cropImage(
+                `file://${tempPath}`,
+                cropData,
+              );
+              console.log('✅ Flipped image URI:', finalUri);
+            } catch (flipErr) {
+              console.error('❌ Error flipping mirrored image:', flipErr);
+              setError('Failed to flip mirrored image');
+              return;
+            }
+          }
+          const uriToRead = finalUri.uri.startsWith('file://')
+            ? finalUri.uri
+            : `file://${finalUri.uri}`;
+          const base64 = await RNFS.readFile(uriToRead, 'base64');
+
           const result = await OnnxModule.runModelFromBase64(base64);
           console.log('coords', result);
 
@@ -94,7 +120,7 @@ const ARScreen = () => {
     <View style={styles.container}>
       <Camera
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
+        style={{width: 424, height: 884}}
         device={device}
         isActive={true}
         photo={true}
@@ -103,8 +129,43 @@ const ARScreen = () => {
           setIsCameraReady(true);
         }}
       />
+      {console.log('dimension', Dimensions.get('window'))}
 
+      {currentCoord &&
+        console.log(
+          '1>>',
+          (currentCoord.x / 2328) *
+            (Dimensions.get('window').width * Dimensions.get('window').scale),
+        )}
+      {currentCoord &&
+        console.log(
+          '2>>',
+          (currentCoord.y / 1746) *
+            (Dimensions.get('window').height * Dimensions.get('window').scale),
+        )}
       {currentCoord && (
+        <Image
+          source={
+            selectedKeypoint === 'Neck'
+              ? require('./../../assets/icons/necklace.png')
+              : require('./../../assets/icons/earring.png')
+          }
+          style={[
+            selectedKeypoint === 'Neck' ? styles.necklace : styles.overlay,
+            {
+              left:
+                (currentCoord.x / 2328) *
+                (Dimensions.get('window').width *
+                  Dimensions.get('window').scale),
+              top:
+                (currentCoord.y / 1746) *
+                (Dimensions.get('window').height *
+                  Dimensions.get('window').scale),
+            },
+          ]}
+        />
+      )}
+      {/* {currentCoord && (
         <Image
           source={
             selectedKeypoint === 'Neck'
@@ -131,7 +192,7 @@ const ARScreen = () => {
             },
           ]}
         />
-      )}
+      )} */}
 
       <View style={styles.controls}>
         {['LeftEar', 'RightEar', 'Neck'].map(key => (
